@@ -11,6 +11,8 @@ class App:
         
         self.canvas = tk.Canvas(root)
         self.canvas.pack(fill=tk.BOTH, expand=True)
+        self.image_on_canvas = None
+        self.rect_coords = None
         
         self.canvas.bind("<ButtonPress-1>", self.on_button_press)
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
@@ -30,13 +32,45 @@ class App:
 
         self.root.bind("<Configure>", self.on_resize)
 
+        self.prev_button = tk.Button(self.root, text="<< Prev", command=self.prev_page)
+        self.prev_button.pack(side=tk.LEFT, padx=10)
+        self.next_button = tk.Button(self.root, text="Next >>", command=self.next_page)
+        self.next_button.pack(side=tk.LEFT, padx=10)
+
+        self.current_page_num = 0
+
+        self.display_page(self.pages[self.current_page_num])
+
     def display_page(self, page, resize_for_display=True):
+        # Delete the previous image (if it exists) from the canvas
+        if self.image_on_canvas:
+            self.canvas.delete(self.image_on_canvas)
+
+        # Display the new image
         if resize_for_display:
             width, height = self.root.winfo_width(), self.root.winfo_height()
             page = page.resize((width, height))
         self.current_image = ImageTk.PhotoImage(page)
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.current_image)
-        self.canvas.config(scrollregion=self.canvas.bbox(tk.ALL))
+        self.image_on_canvas = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.current_image)
+
+        self.canvas.lower(self.image_on_canvas)
+
+        # Ensure the rectangle is drawn or updated
+        if not self.rect and self.rect_coords:
+            self.rect = self.canvas.create_rectangle(*self.rect_coords, outline="red")
+        elif self.rect:
+            self.canvas.coords(self.rect, *self.rect_coords)
+
+
+    def prev_page(self):
+        if self.current_page_num > 0:
+            self.current_page_num -= 1
+            self.display_page(self.pages[self.current_page_num])
+
+    def next_page(self):
+        if self.current_page_num < len(self.pages) - 1:
+            self.current_page_num += 1
+            self.display_page(self.pages[self.current_page_num])
 
     def on_button_press(self, event):
         self.start_x = self.canvas.canvasx(event.x)
@@ -49,6 +83,7 @@ class App:
         self.canvas.coords(self.rect, self.start_x, self.start_y, self.canvas.canvasx(event.x), self.canvas.canvasy(event.y))
 
     def on_button_release(self, event):
+        self.rect_coords = self.canvas.coords(self.rect)
         pass
 
     def tokenize(self):
