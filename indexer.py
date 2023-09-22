@@ -22,6 +22,15 @@ class App:
         self.start_x = None
         self.start_y = None
 
+        self.canvas.bind("<ButtonPress-3>", self.on_button_press_green)
+        self.canvas.bind("<B3-Motion>", self.on_mouse_drag_green)
+        self.canvas.bind("<ButtonRelease-3>", self.on_button_release_green)
+
+        self.rect_green = None
+        self.rect_coords_green = None
+        self.start_x_green = None
+        self.start_y_green = None
+
         self.pdf_path = filedialog.askopenfilename(title="Open PDF", filetypes=[("PDF Files", "*.pdf")])
         self.pages = convert_from_path(self.pdf_path)
 
@@ -61,6 +70,13 @@ class App:
         elif self.rect:
             self.canvas.coords(self.rect, *self.rect_coords)
 
+        # Ensure the green rectangle is drawn or updated
+        if not self.rect_green and self.rect_coords_green:
+            self.rect_green = self.canvas.create_rectangle(*self.rect_coords_green, outline="green")
+        elif self.rect_green:
+            self.canvas.coords(self.rect_green, *self.rect_coords_green)
+
+
 
     def prev_page(self):
         if self.current_page_num > 0:
@@ -86,27 +102,44 @@ class App:
         self.rect_coords = self.canvas.coords(self.rect)
         pass
 
+    def on_button_press_green(self, event):
+        self.start_x_green = self.canvas.canvasx(event.x)
+        self.start_y_green = self.canvas.canvasy(event.y)
+        if self.rect_green:
+            self.canvas.delete(self.rect_green)
+        self.rect_green = self.canvas.create_rectangle(self.start_x_green, self.start_y_green, self.start_x_green, self.start_y_green, outline="green")
+
+    def on_mouse_drag_green(self, event):
+        self.canvas.coords(self.rect_green, self.start_x_green, self.start_y_green, self.canvas.canvasx(event.x), self.canvas.canvasy(event.y))
+
+    def on_button_release_green(self, event):
+        self.rect_coords_green = self.canvas.coords(self.rect_green)
+
+
     def tokenize(self):
         results = []
 
-        if self.rect:
-            rect_coords = self.canvas.coords(self.rect)
+        # Function to get OCR results given rectangle coordinates
+        def get_ocr_for_coords(rect_coords, color):
+            if rect_coords:
+                scale_x = self.pages[0].width / self.root.winfo_width()
+                scale_y = self.pages[0].height / self.root.winfo_height()
 
-            # calculate the scaling factor
-            scale_x = self.pages[0].width / self.root.winfo_width()
-            scale_y = self.pages[0].height / self.root.winfo_height()
+                # adjust the coordinates to match the original image size
+                adjusted_coords = [rect_coords[0] * scale_x, rect_coords[1] * scale_y, rect_coords[2] * scale_x, rect_coords[3] * scale_y]
 
-            # adjust the coordinates to match the original image size
-            rect_coords = [rect_coords[0] * scale_x, rect_coords[1] * scale_y, rect_coords[2] * scale_x, rect_coords[3] * scale_y]
+                for idx, page in enumerate(self.pages):
+                    cropped = page.crop(adjusted_coords)
+                    text = pytesseract.image_to_string(cropped, lang='grc')
+                    tokens = text.split()  # basic tokenization
+                    results.append((idx, tokens, color))
 
-            for idx, page in enumerate(self.pages):
-                cropped = page.crop(rect_coords)
-                text = pytesseract.image_to_string(cropped, lang='grc')
-                tokens = text.split()  # basic tokenization
-                results.append((idx, tokens))
+        get_ocr_for_coords(self.rect_coords, "red")
+        get_ocr_for_coords(self.rect_coords_green, "green")
 
-        for idx, tokens in results:
-            print(f"Page {idx + 1}: {tokens}")
+        for idx, tokens, color in results:
+            print(f"Page {idx + 1} ({color} area): {tokens}")
+
 
 
     def on_resize(self, event):
