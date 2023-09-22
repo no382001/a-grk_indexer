@@ -1,0 +1,3 @@
+cltk pytesseract pdf2image
+
+tesseract-ocr-grc https://ancientgreekocr.org/
